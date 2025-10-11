@@ -36,14 +36,14 @@ const QUICK_SYMPTOMS = [
 ];
 
 export default function HomePage() {
-  const [age, setAge] = useState(30);
-  const [heightCm, setHeightCm] = useState<number | "">(170);
-  const [weightKg, setWeightKg] = useState<number | "">(65);
+  const [age, setAge] = useState<number | "">("");
+  const [heightCm, setHeightCm] = useState<number | "">("");
+  const [weightKg, setWeightKg] = useState<number | "">("");
   const [sex, setSex] = useState<Sex>("unknown");
-  const [durationDays, setDurationDays] = useState<number | "">(3);
-  const [chiefComplaint, setChiefComplaint] = useState("sore throat and fever");
-  const [symptomInput, setSymptomInput] = useState("sore throat, runny nose, cough");
-  const [riskFactors, setRiskFactors] = useState("smoker");
+  const [durationDays, setDurationDays] = useState<number | "">("");
+  const [chiefComplaint, setChiefComplaint] = useState("");
+  const [symptomInput, setSymptomInput] = useState("");
+  const [riskFactors, setRiskFactors] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<ApiResponse | null>(null);
@@ -188,7 +188,7 @@ export default function HomePage() {
           </div>
 
           <label className="flex flex-col gap-1 text-sm">
-            <span>Chief complaint</span>
+            <span>Chief complaint (briefly describe your main issue)</span>
             <input
               type="text"
               value={chiefComplaint}
@@ -199,7 +199,7 @@ export default function HomePage() {
           </label>
 
           <label className="flex flex-col gap-1 text-sm">
-            <span>Symptoms (comma separated)</span>
+            <span>Symptoms (select or list all symptoms, comma separated)</span>
             <textarea
               value={symptomInput}
               onChange={(event) => setSymptomInput(event.target.value)}
