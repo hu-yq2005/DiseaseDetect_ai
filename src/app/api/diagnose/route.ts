@@ -15,19 +15,40 @@ const intakeSchema = z.object({
   riskFactors: z.array(z.string()).optional(),
 });
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENAI_API_KEY || "");
+const apiKey = process.env.GOOGLE_GENAI_API_KEY;
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 const TRIAGE_LEVELS = ["home", "pcp", "urgent", "emergent"] as const;
+const DEFAULT_DISCLAIMER = "Educational use only. Not a medical diagnosis.";
 
 type TriageLevel = (typeof TRIAGE_LEVELS)[number];
 
-export async function POST(request: Request) {
-  if (!process.env.GOOGLE_GENAI_API_KEY) {
-    return NextResponse.json({
-      error: "GOOGLE_GENAI_API_KEY is not configured.",
-    }, { status: 500 });
-  }
+type Candidate = {
+  id: string;
+  label: string;
+  dept: string;
+  score: number;
+  otcHints: string[];
+};
 
+const llmStructuredSchema = z.object({
+  triage: z.enum(TRIAGE_LEVELS),
+  explanations: z
+    .array(
+      z.object({
+        name: z.string(),
+        why: z.string(),
+        likelihood: z.number().min(0).max(1),
+      }),
+    )
+    .default([]),
+  otc_suggestions: z.array(z.string()).default([]),
+  recommended_department: z.string(),
+  return_precautions: z.array(z.string()).default([]),
+  disclaimer: z.string().default(DEFAULT_DISCLAIMER),
+});
+
+export async function POST(request: Request) {
   const body = await request.json();
   const parsed = intakeSchema.safeParse(body);
   if (!parsed.success) {
@@ -41,12 +62,12 @@ export async function POST(request: Request) {
       triage: "emergent",
       message:
         "Your description includes potential red-flag symptoms. Please seek urgent medical attention or call emergency services immediately.",
-      disclaimer: "Educational use only. Not a medical diagnosis.",
+      disclaimer: DEFAULT_DISCLAIMER,
     });
   }
 
   const ranked = scoreConditions(intake);
-  const candidates = ranked.map((entry) => {
+  const candidates: Candidate[] = ranked.map((entry) => {
     const rule = RULES.find((r) => r.id === entry.id)!;
     return {
       id: rule.id,
@@ -56,6 +77,12 @@ export async function POST(request: Request) {
       otcHints: rule.otcHints ?? [],
     };
   });
+
+  const fallback = buildFallbackResponse(intake, candidates);
+
+  if (!genAI) {
+    return NextResponse.json(fallback);
+  }
 
   const prompt = `You are a careful health education and triage assistant.
 - NEVER make definitive diagnoses or prescribe exact dosages.
@@ -83,40 +110,116 @@ Return JSON ONLY in the format:
 Then after the JSON, output a patient-friendly summary between <<<TEXT>>> and <<<END>>>.
 `;
 
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-  const result = await model.generateContent({
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: prompt }],
-      },
-    ],
-  });
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const result = await model.generateContent({
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }],
+        },
+      ],
+    });
 
-  const fullText = result.response.text();
-  const jsonMatch = fullText.match(/\{[\s\S]*?\}\s*(?=<<<TEXT>>>)/);
-  let parsedLLM: {
-    triage: TriageLevel;
-    explanations: { name: string; why: string; likelihood: number }[];
-    otc_suggestions: string[];
-    recommended_department: string;
-    return_precautions: string[];
-    disclaimer: string;
-  } | null = null;
+    const fullText = result.response.text();
+    const jsonMatch = fullText.match(/\{[\s\S]*?\}\s*(?=<<<TEXT>>>)/);
+    let parsedLLM: z.infer<typeof llmStructuredSchema> | null = null;
 
-  if (jsonMatch) {
-    try {
-      parsedLLM = JSON.parse(jsonMatch[0]);
-    } catch (error) {
-      parsedLLM = null;
+    if (jsonMatch) {
+        try {
+          const candidateJSON = JSON.parse(jsonMatch[0]);
+          const parsed = llmStructuredSchema.safeParse(candidateJSON);
+          parsedLLM = parsed.success ? parsed.data : null;
+        } catch (error) {
+          parsedLLM = null;
+        }
     }
+
+    const summaryMatch = fullText.match(/<<<TEXT>>>([\s\S]*?)<<<END>>>/);
+
+    if (parsedLLM) {
+      return NextResponse.json({
+        triage: parsedLLM.triage,
+        structured: parsedLLM,
+        summary: summaryMatch ? summaryMatch[1].trim() : fullText,
+      });
+    }
+
+    return NextResponse.json({
+      ...fallback,
+      summary: summaryMatch ? summaryMatch[1].trim() : fallback.summary,
+    });
+  } catch (error) {
+    console.error("Gemini request failed", error);
+    return NextResponse.json(fallback);
   }
+}
 
-  const summaryMatch = fullText.match(/<<<TEXT>>>([\s\S]*?)<<<END>>>/);
+function buildFallbackResponse(intake: Intake, candidates: Candidate[]) {
+  const [top, ...rest] = candidates;
+  const text = (intake.chiefComplaint + " " + intake.symptoms.join(" ")).toLowerCase();
 
-  return NextResponse.json({
-    triage: parsedLLM?.triage ?? "pcp",
-    structured: parsedLLM,
-    summary: summaryMatch ? summaryMatch[1].trim() : fullText,
-  });
+  const explanations = [top, ...rest]
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((candidate) => {
+      const rule = RULES.find((item) => item.id === candidate.id);
+      const matchedKeywords = rule
+        ? Object.keys(rule.keywords).filter((keyword) => text.includes(keyword))
+        : [];
+
+      return {
+        name: candidate.label,
+        why:
+          matchedKeywords.length > 0
+            ? `Reported symptoms such as ${matchedKeywords.join(", ")} overlap with this condition's common presentation.`
+            : "Heuristic symptom scoring suggested this as a possible consideration.",
+        likelihood: Number(candidate.score.toFixed(2)),
+      };
+    });
+
+  const recommendedDepartment = top?.dept ?? "Primary Care";
+  const triage = inferTriageLevel(recommendedDepartment);
+
+  const structured = {
+    triage,
+    explanations,
+    otc_suggestions: top?.otcHints ?? [],
+    recommended_department: recommendedDepartment,
+    return_precautions: [
+      "Seek urgent medical care if you develop new severe pain, trouble breathing, confusion, chest discomfort, or other red-flag symptoms.",
+    ],
+    disclaimer: DEFAULT_DISCLAIMER,
+  };
+
+  const summarySegments = [
+    explanations.length
+      ? `Top considerations include ${explanations
+          .map((item) => `${item.name} (${Math.round(item.likelihood * 100)}% heuristic match)`).join(", "
+        )}.`
+      : "Symptoms did not strongly match any built-in condition heuristics.",
+    `A reasonable next step is to follow up with ${recommendedDepartment}.`,
+    "Monitor for any rapid worsening or red-flag changes and seek urgent care if they occur.",
+    structured.disclaimer,
+  ];
+
+  return {
+    triage,
+    structured,
+    summary: summarySegments.join("\n\n"),
+  };
+}
+
+function inferTriageLevel(department: string): TriageLevel {
+  const normalized = department.toLowerCase();
+  if (normalized.includes("emerg")) {
+    return "emergent";
+  }
+  if (normalized.includes("urgent")) {
+    return "urgent";
+  }
+  if (normalized.includes("home")) {
+    return "home";
+  }
+  return "pcp";
 }

@@ -1,4 +1,4 @@
-// File: /Users/hyq/Documents/git project/DiseaseDetect/src/app/page.tsx
+// File: /Users/xxy/DiseaseDetect/src/app/page.tsx
 import * as entry from '../../../src/app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

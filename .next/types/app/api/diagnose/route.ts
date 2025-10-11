@@ -1,4 +1,4 @@
-// File: /Users/hyq/Documents/git project/DiseaseDetect/src/app/api/diagnose/route.ts
+// File: /Users/xxy/DiseaseDetect/src/app/api/diagnose/route.ts
 import * as entry from '../../../../../src/app/api/diagnose/route.js'
 import type { NextRequest } from 'next/server.js'
 
