@@ -495,9 +495,6 @@ video {
   --tw-backdrop-saturate:  ;
   --tw-backdrop-sepia:  ;
 }
-.relative {
-  position: relative;
-}
 .mx-auto {
   margin-left: auto;
   margin-right: auto;
@@ -513,9 +510,6 @@ video {
 }
 .grid {
   display: grid;
-}
-.contents {
-  display: contents;
 }
 .max-w-4xl {
   max-width: 56rem;

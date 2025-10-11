@@ -117,7 +117,7 @@ export default function HomePage() {
         <p className="text-sm uppercase tracking-widest text-sky-600">DiseaseDetect</p>
         <h1 className="text-3xl font-bold">LLM-assisted symptom triage</h1>
         <p className="text-slate-600">
-          输入基础信息和症状，系统将结合启发式规则和 Gemini AI 生成教育用途的分诊建议。
+          Enter basic information and symptoms, and the system will generate triage recommendations for educational purposes by combining heuristic rules with Gemini AI.
         </p>
       </header>
 
@@ -152,7 +152,7 @@ export default function HomePage() {
                 max={260}
                 value={heightCm}
                 onChange={(event) => setHeightCm(event.target.value === "" ? "" : Number(event.target.value))}
-                placeholder="可选"
+                placeholder="Optional"
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
@@ -163,7 +163,7 @@ export default function HomePage() {
                 max={350}
                 value={weightKg}
                 onChange={(event) => setWeightKg(event.target.value === "" ? "" : Number(event.target.value))}
-                placeholder="可选"
+                placeholder="Optional"
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
@@ -182,7 +182,7 @@ export default function HomePage() {
                 type="text"
                 value={riskFactors}
                 onChange={(event) => setRiskFactors(event.target.value)}
-                placeholder="如 smoker, pregnancy"
+                placeholder="e.g. smoker, pregnancy"
               />
             </label>
           </div>
@@ -193,7 +193,7 @@ export default function HomePage() {
               type="text"
               value={chiefComplaint}
               onChange={(event) => setChiefComplaint(event.target.value)}
-              placeholder="例如 sore throat and fever"
+              placeholder="e.g. sore throat and fever"
               required
             />
           </label>
@@ -227,7 +227,7 @@ export default function HomePage() {
 
           <div className="flex items-center justify-between gap-4">
             <p className="text-xs text-slate-500">
-              数据仅用于实时推理，不会存储。AI 输出仅供参考，请务必结合专业医生建议。
+              Data is used solely for real-time inference and will not be stored. AI outputs are for reference only; always consult a licensed healthcare professional.
             </p>
             <button type="submit" className="primary px-4 py-2" disabled={loading}>
               {loading ? "Assessing..." : "Assess now"}
