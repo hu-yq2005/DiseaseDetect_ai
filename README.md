@@ -19,6 +19,19 @@ SDK that DiseaseDetect relies on.  The helper synchronises the ``GOOGLE_GENAI_AP
 The :func:`disease_detect.ensure_google_genai_api_key` function will look for both variable names
 and sets the one required by the Google SDK when it finds a value.
 
+## User accounts
+
+Users must sign in before using the symptom checker. Accounts are stored with Prisma
+(SQLite by default, in ``prisma/dev.db``); passwords are hashed with bcrypt and sessions are
+signed JWTs in an httpOnly cookie.
+
+1. Copy ``.env.example`` to ``.env`` and set ``AUTH_SECRET`` (``openssl rand -base64 32``).
+2. Create the database: ``npx prisma migrate dev``.
+3. Start the app: ``npm run dev``, then visit ``/register``.
+
+To use PostgreSQL instead, change ``provider`` in ``prisma/schema.prisma`` to ``"postgresql"``
+and set ``DATABASE_URL`` to your connection string.
+
 ## Development
 
 Install the development dependencies and run the test-suite:

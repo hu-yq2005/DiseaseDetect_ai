@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import UserMenu from "@/components/UserMenu";
 
 type Sex = "male" | "female" | "other" | "unknown";
 
@@ -113,6 +114,7 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-10 space-y-8">
+      <UserMenu />
       <header className="space-y-2 text-center">
         <p className="text-sm uppercase tracking-widest text-sky-600">DiseaseDetect</p>
         <h1 className="text-3xl font-bold">LLM-assisted symptom triage</h1>
